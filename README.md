@@ -452,6 +452,38 @@ Enables secure CI/CD without long-term credentials:
 2. Choose environment and action: "destroy"
 3. Confirm destruction
 
+## 🧹 Cleanup & Troubleshooting
+
+### Dependency Cleanup Scripts
+
+If `terraform destroy` fails due to dependencies, use these cleanup scripts:
+
+```bash
+# Navigate to environment
+cd environments/dev
+
+# Check what dependencies exist
+../../check-vpc-dependencies.sh
+
+# Option 1: Standard cleanup
+../../cleanup-dependencies.sh
+
+# Option 2: Nuclear cleanup (for persistent issues)
+../../nuclear-vpc-cleanup.sh
+
+# Then retry destroy
+terraform destroy
+```
+
+**Available Scripts:**
+- `cleanup-dependencies.sh` - Full Kubernetes and AWS cleanup
+- `nuclear-vpc-cleanup.sh` - Removes ALL VPC dependencies
+- `fix-vpc-dependencies.sh` - Targeted network cleanup
+- `check-vpc-dependencies.sh` - Diagnose remaining dependencies
+- `cleanup-simple.sh` - Basic cleanup with minimal tools
+
+**See [CLEANUP_GUIDE.md](CLEANUP_GUIDE.md) for detailed troubleshooting.**
+
 ## 🌍 Environment Configurations
 
 ### Development Environment
@@ -570,6 +602,26 @@ BusinessUnit: platform
 - Automatic handling of spot interruptions
 
 ## 🔧 Troubleshooting
+
+### Terraform Destroy Issues
+
+**Problem**: `terraform destroy` fails with dependency violations
+
+**Solution**: Use cleanup scripts before destroying
+```bash
+cd environments/dev
+../../nuclear-vpc-cleanup.sh  # For persistent VPC issues
+terraform destroy
+```
+
+**Problem**: "VPC has dependencies and cannot be deleted"
+
+**Solution**: 
+```bash
+../../check-vpc-dependencies.sh  # See what's left
+../../nuclear-vpc-cleanup.sh     # Remove everything
+terraform destroy
+```
 
 ### Common Issues
 
