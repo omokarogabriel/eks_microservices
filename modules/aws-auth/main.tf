@@ -1,4 +1,4 @@
-resource "kubernetes_config_map" "aws_auth" {
+resource "kubernetes_config_map_v1_data" "aws_auth" {
   metadata {
     name      = "aws-auth"
     namespace = "kube-system"
@@ -17,5 +17,6 @@ resource "kubernetes_config_map" "aws_auth" {
     mapAccounts = var.map_accounts != null ? yamlencode(var.map_accounts) : ""
   }
 
+  force      = true
   depends_on = [var.cluster_id]
 }

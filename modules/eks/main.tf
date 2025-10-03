@@ -3,7 +3,7 @@ resource "aws_cloudwatch_log_group" "eks" {
   count             = var.enable_cluster_logging ? 1 : 0
   name              = "/aws/eks/${var.cluster_name}/cluster"
   retention_in_days = var.cluster_log_retention_days
-  kms_key_id        = var.kms_key_arn
+  # kms_key_id        = var.kms_key_arn  # Disabled to avoid permission issues
 
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-eks-logs"
@@ -38,7 +38,12 @@ resource "aws_eks_cluster" "this" {
 
   depends_on = [aws_cloudwatch_log_group.eks]
 
-
+  lifecycle {
+    ignore_changes = [
+      vpc_config[0].public_access_cidrs,
+      vpc_config[0].security_group_ids
+    ]
+  }
 
   tags = merge(var.common_tags, {
     Name = var.cluster_name
@@ -76,6 +81,7 @@ resource "aws_eks_addon" "kube_proxy" {
 }
 
 resource "aws_eks_addon" "ebs_csi_driver" {
+  count                    = var.ebs_csi_role_arn != null ? 1 : 0
   cluster_name             = aws_eks_cluster.this.name
   addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = var.ebs_csi_role_arn

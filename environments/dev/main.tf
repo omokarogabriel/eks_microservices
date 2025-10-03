@@ -52,18 +52,9 @@ module "kms" {
 module "iam_roles" {
   source = "../../modules/iam_role"
 
-  cluster_name = var.cluster_name
-  common_tags  = local.common_tags
-}
-
-module "oidc" {
-  source = "../../modules/oidc"
-
-  cluster_name            = var.cluster_name
-  cluster_oidc_issuer_url = module.eks.cluster_oidc_issuer_url
-  common_tags             = local.common_tags
-
-  depends_on = [module.eks]
+  cluster_name         = var.cluster_name
+  enable_ebs_csi_driver = false
+  common_tags          = local.common_tags
 }
 
 module "rds" {
@@ -164,11 +155,21 @@ module "eks" {
   min_size               = var.min_size
   cluster_role_arn       = module.iam_roles.eks_cluster_role_arn
   node_role_arn          = module.iam_roles.eks_node_role_arn
-  ebs_csi_role_arn       = module.iam_roles.eks_ebs_csi_role_arn
+  # ebs_csi_role_arn       = module.iam_roles.eks_ebs_csi_role_arn  # Disabled for now
   kms_key_arn            = module.kms.kms_key_arn
   disk_size              = var.disk_size
   capacity_type          = var.capacity_type
   common_tags            = local.common_tags
 
   depends_on = [module.iam_roles]
+}
+
+module "oidc" {
+  source = "../../modules/oidc"
+
+  cluster_name            = var.cluster_name
+  cluster_oidc_issuer_url = module.eks.cluster_oidc_issuer_url
+  common_tags             = local.common_tags
+
+  depends_on = [module.eks]
 }

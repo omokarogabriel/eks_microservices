@@ -28,7 +28,7 @@ postgresql_username = "postgres"
 postgresql_password = "postgres123!"
 mysql_username      = "admin"
 mysql_password      = "mysql123!"
-redis_auth_token    = "redis123token"
+redis_auth_token    = "redis123token456789"
 
 # GitHub Actions Configuration
 github_org  = "omokarogabriel"

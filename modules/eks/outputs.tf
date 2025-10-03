@@ -100,7 +100,7 @@ output "eks_addons" {
     vpc_cni        = aws_eks_addon.vpc_cni.addon_name
     coredns        = aws_eks_addon.coredns.addon_name
     kube_proxy     = aws_eks_addon.kube_proxy.addon_name
-    ebs_csi_driver = aws_eks_addon.ebs_csi_driver.addon_name
+    ebs_csi_driver = length(aws_eks_addon.ebs_csi_driver) > 0 ? aws_eks_addon.ebs_csi_driver[0].addon_name : null
   }
 }
 

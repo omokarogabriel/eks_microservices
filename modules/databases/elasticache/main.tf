@@ -8,7 +8,7 @@ resource "aws_elasticache_subnet_group" "this" {
 }
 
 resource "aws_elasticache_parameter_group" "redis" {
-  family = "redis7.x"
+  family = "redis6.x"
   name   = "${var.cluster_name}-redis-params"
 
   parameter {
@@ -28,7 +28,7 @@ resource "aws_elasticache_replication_group" "redis" {
   parameter_group_name = aws_elasticache_parameter_group.redis.name
 
   num_cache_clusters = var.redis_num_cache_nodes
-  engine_version     = "7.0"
+  engine_version     = "6.2"
 
   subnet_group_name  = aws_elasticache_subnet_group.this.name
   security_group_ids = [var.redis_security_group_id]
