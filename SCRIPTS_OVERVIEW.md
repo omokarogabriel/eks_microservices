@@ -147,6 +147,12 @@ If all scripts fail:
 3. Remove resources from state: `terraform state rm resource`
 4. Contact AWS Support for stuck resources
 
+## 🗑️ Git Issues
+
+For Git-related problems (large files, repository size):
+- **See [GIT_CLEANUP_GUIDE.md](GIT_CLEANUP_GUIDE.md)** for comprehensive Git cleanup solutions
+- **Quick fix**: `pip install git-filter-repo && git filter-repo --path .terraform --invert-paths`
+
 ## 🎯 Best Practices
 
 1. **Always check first**: Use `check-vpc-dependencies.sh` before cleanup

@@ -251,6 +251,22 @@ kubectl get namespace <namespace> -o json | jq '.spec.finalizers = []' | kubectl
 ../../fix-vpc-dependencies.sh
 ```
 
+### Issue: "File is larger than GitHub's maximum file size"
+**Solution**: Remove large Terraform files from Git history
+```bash
+# Install git-filter-repo
+pip install git-filter-repo
+
+# Remove large files from Git history
+git filter-repo --path environments/dev/.terraform --invert-paths
+git push origin dev --force
+
+# For all environments
+git filter-repo --path .terraform --invert-paths
+git filter-repo --path terraform.tfstate --invert-paths
+git push origin main --force
+```
+
 ## 📊 Cleanup Order (Important!)
 
 1. **Helm Releases** (applications)
@@ -293,7 +309,17 @@ terraform destroy -auto-approve
    terraform destroy
    ```
 
-3. **State File Cleanup** (Last Resort):
+3. **Git History Cleanup** (For Large Files):
+   ```bash
+   # Install git-filter-repo
+   pip install git-filter-repo
+   
+   # Remove large Terraform files from Git history
+   git filter-repo --path environments/dev/.terraform --invert-paths
+   git push origin dev --force
+   ```
+
+4. **State File Cleanup** (Last Resort):
    ```bash
    # Remove problematic resources from state
    terraform state rm 'module.vpc.aws_vpc.this'

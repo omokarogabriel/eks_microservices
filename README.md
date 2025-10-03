@@ -623,6 +623,15 @@ terraform destroy
 terraform destroy
 ```
 
+**Problem**: "File is larger than GitHub's maximum file size"
+
+**Solution**: Remove large Terraform files from Git history
+```bash
+pip install git-filter-repo
+git filter-repo --path environments/dev/.terraform --invert-paths
+git push origin dev --force
+```
+
 ### Common Issues
 
 **1. Cluster Access Issues**
