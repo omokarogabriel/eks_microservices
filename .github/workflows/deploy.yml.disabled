@@ -1,12 +1,14 @@
+# DISABLED - Use infrastructure-deploy.yml instead
+# This workflow only deploys applications to existing infrastructure
+# For complete deployment (infrastructure + applications), use infrastructure-deploy.yml
+
 name: Deploy to EKS (DISABLED)
 
-# DISABLED: This workflow was automatically deploying to production
-# Use 'Deploy Infrastructure' workflow instead for safe manual deployments
 on:
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -36,13 +38,19 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ENVIRONMENT == 'dev' && secrets.AWS_ROLE_ARN_DEV || env.ENVIRONMENT == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+          role-to-assume: ${{ github.event.inputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || github.event.inputs.environment == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set environment variables
         run: |
           ENV=${{ github.event.inputs.environment || 'prod' }}
-          echo "CLUSTER_NAME=${ENV}-eks-cluster" >> $GITHUB_ENV
+          if [ "$ENV" = "dev" ]; then
+            echo "CLUSTER_NAME=retail-store-dev" >> $GITHUB_ENV
+          elif [ "$ENV" = "staging" ]; then
+            echo "CLUSTER_NAME=retail-store-staging" >> $GITHUB_ENV
+          else
+            echo "CLUSTER_NAME=retail-store-prod" >> $GITHUB_ENV
+          fi
           echo "ENVIRONMENT=${ENV}" >> $GITHUB_ENV
 
       - name: Update kubeconfig
@@ -71,7 +79,7 @@ jobs:
           # Deploy Cart Service
           helm upgrade --install cart ./helm-chart \
             --namespace retail-store-${{ env.ENVIRONMENT }} \
-            --values ./helm-chart/microservices/cart/values.yaml \
+            --values ./microservices/cart/values.yaml \
             --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
             --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
             --wait --timeout=300s
@@ -79,7 +87,7 @@ jobs:
           # Deploy Catalog Service
           helm upgrade --install catalog ./helm-chart \
             --namespace retail-store-${{ env.ENVIRONMENT }} \
-            --values ./helm-chart/microservices/catalog/values.yaml \
+            --values ./microservices/catalog/values.yaml \
             --set database.mysql.host=$(echo $MYSQL_SECRET | jq -r '.host') \
             --set database.mysql.username=$(echo $MYSQL_SECRET | jq -r '.username') \
             --set database.mysql.password=$(echo $MYSQL_SECRET | jq -r '.password') \
@@ -88,7 +96,7 @@ jobs:
           # Deploy Order Service
           helm upgrade --install order ./helm-chart \
             --namespace retail-store-${{ env.ENVIRONMENT }} \
-            --values ./helm-chart/microservices/order/values.yaml \
+            --values ./microservices/order/values.yaml \
             --set database.postgresql.host=$(echo $POSTGRES_SECRET | jq -r '.host') \
             --set database.postgresql.username=$(echo $POSTGRES_SECRET | jq -r '.username') \
             --set database.postgresql.password=$(echo $POSTGRES_SECRET | jq -r '.password') \
@@ -97,7 +105,7 @@ jobs:
           # Deploy Checkout Service
           helm upgrade --install checkout ./helm-chart \
             --namespace retail-store-${{ env.ENVIRONMENT }} \
-            --values ./helm-chart/microservices/checkout/values.yaml \
+            --values ./microservices/checkout/values.yaml \
             --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
             --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
             --wait --timeout=300s
@@ -105,7 +113,7 @@ jobs:
           # Deploy UI Service
           helm upgrade --install ui ./helm-chart \
             --namespace retail-store-${{ env.ENVIRONMENT }} \
-            --values ./helm-chart/microservices/ui/values.yaml \
+            --values ./microservices/ui/values.yaml \
             --wait --timeout=300s
 
       - name: Verify deployments

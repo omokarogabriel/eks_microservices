@@ -107,10 +107,10 @@ output "eks_addons" {
 output "node_group_resources" {
   description = "EKS node group resource information"
   value = {
-    capacity_type    = aws_eks_node_group.this.capacity_type
-    instance_types   = aws_eks_node_group.this.instance_types
-    ami_type        = aws_eks_node_group.this.ami_type
-    disk_size       = aws_eks_node_group.this.disk_size
-    remote_access   = aws_eks_node_group.this.remote_access
+    capacity_type  = aws_eks_node_group.this.capacity_type
+    instance_types = aws_eks_node_group.this.instance_types
+    ami_type       = aws_eks_node_group.this.ami_type
+    disk_size      = aws_eks_node_group.this.disk_size
+    remote_access  = aws_eks_node_group.this.remote_access
   }
 }

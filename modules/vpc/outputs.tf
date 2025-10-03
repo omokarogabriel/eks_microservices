@@ -66,13 +66,13 @@ output "availability_zones" {
 output "network_configuration" {
   description = "Complete network configuration"
   value = {
-    vpc_id                = aws_vpc.this.id
-    vpc_cidr             = aws_vpc.this.cidr_block
-    public_subnets       = aws_subnet.public[*].id
-    private_subnets      = aws_subnet.private[*].id
-    internet_gateway     = aws_internet_gateway.this.id
-    nat_gateways        = aws_nat_gateway.this[*].id
-    availability_zones   = data.aws_availability_zones.available.names
+    vpc_id             = aws_vpc.this.id
+    vpc_cidr           = aws_vpc.this.cidr_block
+    public_subnets     = aws_subnet.public[*].id
+    private_subnets    = aws_subnet.private[*].id
+    internet_gateway   = aws_internet_gateway.this.id
+    nat_gateways       = aws_nat_gateway.this[*].id
+    availability_zones = data.aws_availability_zones.available.names
   }
 }
 

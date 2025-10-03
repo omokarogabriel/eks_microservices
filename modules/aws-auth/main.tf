@@ -12,8 +12,8 @@ resource "kubernetes_config_map" "aws_auth" {
         groups   = ["system:bootstrappers", "system:nodes"]
       }
     ])
-    
-    mapUsers = var.map_users != null ? yamlencode(var.map_users) : ""
+
+    mapUsers    = var.map_users != null ? yamlencode(var.map_users) : ""
     mapAccounts = var.map_accounts != null ? yamlencode(var.map_accounts) : ""
   }
 

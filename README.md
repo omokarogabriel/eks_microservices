@@ -65,7 +65,7 @@ aws eks update-kubeconfig --region us-east-1 --name <cluster-name>
 kubectl get nodes
 ```
 
-### 4. Setup GitHub Actions (Optional)
+### 4. Setup GitHub Actions
 
 ```bash
 # Get GitHub Actions role ARN
@@ -73,10 +73,26 @@ cd environments/prod
 terraform output github_actions_role_arn
 
 # Add to GitHub repository secrets:
-# AWS_ROLE_ARN = <role-arn-from-output>
-# POSTGRESQL_PASSWORD = <your-postgres-password>
-# MYSQL_PASSWORD = <your-mysql-password>
-# REDIS_AUTH_TOKEN = <your-redis-token>
+# AWS_ROLE_ARN_DEV = arn:aws:iam::438465156402:role/retail-store-dev-github-actions-role
+# AWS_ROLE_ARN_STAGING = arn:aws:iam::438465156402:role/retail-store-staging-github-actions-role
+# AWS_ROLE_ARN_PROD = arn:aws:iam::438465156402:role/retail-store-prod-github-actions-role
+```
+
+### 5. Deploy with GitHub Actions
+
+**Option 1: Infrastructure + Applications (Recommended)**
+```bash
+# Go to GitHub Actions
+# Select "Deploy Infrastructure" workflow
+# Choose environment and "apply" action
+# Applications deploy automatically
+```
+
+**Option 2: Applications Only**
+```bash
+# Go to GitHub Actions
+# Select "Deploy Applications" workflow
+# Provide cluster name from Terraform output
 ```
 
 ## 🏗️ Architecture Overview
@@ -393,42 +409,48 @@ Enables secure CI/CD without long-term credentials:
 
 ## 🚀 GitHub Actions CI/CD
 
-### Automated Deployment
-**Triggers:**
-- **Push to main**: Automatic production deployment
-- **Pull Request**: Validation and testing
-- **Manual Dispatch**: Deploy to any environment
+### Automated Deployment Workflows
 
-**Workflows:**
-- **Deploy**: Application deployment with database secrets
-- **Destroy**: Infrastructure destruction with confirmation
+**1. Deploy Infrastructure (`infrastructure-deploy.yml`)**
+- Deploys Terraform infrastructure
+- Automatically triggers application deployment
+- Supports plan/apply/destroy actions
+- Environment-specific role assumption
+
+**2. Deploy Applications (`deploy-apps.yml`)**
+- Deploys all 5 Gabriel Retail Store microservices
+- Installs AWS Load Balancer Controller
+- Waits for cluster readiness
+- Comprehensive health checks
 
 ### Security Features
 **OIDC Integration:**
 - No long-term AWS credentials stored
-- Temporary credentials via GitHub OIDC
+- Environment-specific IAM roles
 - Repository-scoped access control
+- Account ID: 438465156402
 
 **Database Integration:**
 - Automatic secrets retrieval from AWS Secrets Manager
 - Environment-specific database connections
-- Secure credential handling
+- Secure credential injection into pods
 
 ### Usage
-**Manual Deployment:**
-1. Go to Actions tab in GitHub
-2. Select "Deploy to EKS" workflow
-3. Click "Run workflow"
-4. Choose environment (dev/staging/prod)
-5. Click "Run workflow"
+**Infrastructure + Applications (Recommended):**
+1. Go to Actions tab → "Deploy Infrastructure"
+2. Choose environment (dev/staging/prod)
+3. Choose action: "apply"
+4. Applications deploy automatically after infrastructure
+
+**Applications Only:**
+1. Go to Actions tab → "Deploy Applications"
+2. Choose environment and provide cluster name
+3. Microservices deploy to existing cluster
 
 **Infrastructure Destruction:**
-1. Go to Actions tab in GitHub
-2. Select "Destroy Infrastructure" workflow
-3. Click "Run workflow"
-4. Choose environment to destroy
-5. Type "DESTROY" to confirm
-6. Click "Run workflow"
+1. Go to Actions tab → "Deploy Infrastructure"
+2. Choose environment and action: "destroy"
+3. Confirm destruction
 
 ## 🌍 Environment Configurations
 
@@ -468,29 +490,35 @@ Enables secure CI/CD without long-term credentials:
 
 ## 🔐 Security Features
 
+### Container Security
+- **Non-Root Execution**: All containers run as UID 1000
+- **Read-Only Filesystem**: Immutable runtime environment
+- **Capability Dropping**: Minimal Linux capabilities
+- **Privilege Escalation**: Prevention enabled
+
 ### Network Security
 - **Private Subnets**: Worker nodes isolated from internet
 - **Security Groups**: Least-privilege network access
-- **NACLs**: Additional network-level protection
-- **VPC Flow Logs**: Network traffic monitoring
+- **ALB Integration**: Secure ingress with AWS Load Balancer
+- **Service Mesh Ready**: Prepared for Istio/Linkerd integration
 
 ### Identity & Access Management
-- **IAM Roles**: No long-term credentials
+- **OIDC Authentication**: GitHub Actions with temporary credentials
 - **IRSA**: Secure service account authentication
 - **RBAC**: Kubernetes role-based access control
-- **MFA**: Multi-factor authentication required
+- **Environment Isolation**: Separate roles per environment
 
-### Encryption
-- **At Rest**: KMS encryption for secrets and storage
-- **In Transit**: TLS for all communications
-- **Key Management**: Customer-managed KMS keys
-- **Rotation**: Automatic key rotation enabled
+### Encryption & Secrets
+- **AWS Secrets Manager**: Secure credential storage
+- **KMS Encryption**: Customer-managed keys
+- **In-Transit**: TLS for all communications
+- **Credential Rotation**: Automated rotation support
 
-### Compliance
-- **Audit Logging**: Complete audit trail
-- **Resource Tagging**: Compliance and cost allocation
-- **Access Controls**: Segregation of duties
-- **Data Classification**: Internal data handling
+### Compliance & Monitoring
+- **Security Contexts**: Pod and container security policies
+- **Resource Limits**: Prevent resource exhaustion attacks
+- **Health Checks**: Automated failure detection
+- **Audit Logging**: Complete security audit trail
 
 ## 📈 Monitoring & Logging
 

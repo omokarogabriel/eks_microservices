@@ -1,83 +1,92 @@
-# Infrastructure Summary
-output "infrastructure_summary" {
-  description = "Complete staging infrastructure summary"
-  value = {
-    vpc = {
-      id                = module.vpc.vpc_id
-      cidr             = module.vpc.vpc_cidr_block
-      public_subnets   = module.vpc.public_subnet_ids
-      private_subnets  = module.vpc.private_subnet_ids
-      nat_gateways     = module.vpc.nat_gateway_ids
-    }
-    eks = {
-      cluster_id       = module.eks.cluster_id
-      cluster_endpoint = module.eks.cluster_endpoint
-      cluster_version  = module.eks.cluster_version
-      node_group_arn   = module.eks.node_group_arn
-      addons          = module.eks.eks_addons
-    }
-    security = {
-      cluster_sg = module.security_groups.cluster_security_group_id
-      node_sg    = module.security_groups.node_security_group_id
-      pod_sg     = module.security_groups.pod_security_group_id
-      alb_sg     = module.security_groups.alb_security_group_id
-    }
-    iam = {
-      cluster_role = module.iam_roles.eks_cluster_role_arn
-      node_role    = module.iam_roles.eks_node_role_arn
-      ebs_csi_role = module.iam_roles.eks_ebs_csi_role_arn
-    }
-    encryption = {
-      kms_key_id  = module.kms.kms_key_id
-      kms_key_arn = module.kms.kms_key_arn
-    }
-    oidc = {
-      provider_arn = module.oidc.oidc_provider_arn
-      provider_url = module.oidc.oidc_provider_url
-    }
-    logging = {
-      log_group_name = module.eks.cloudwatch_log_group_name
-      log_group_arn  = module.eks.cloudwatch_log_group_arn
-    }
-  }
-  sensitive = true
+# VPC Outputs
+output "vpc_id" {
+  description = "ID of the VPC"
+  value       = module.vpc.vpc_id
 }
 
-# Connection Information
-output "connection_info" {
-  description = "Information needed to connect to the staging cluster"
-  value = {
-    cluster_name     = var.cluster_name
-    region          = var.region
-    endpoint        = module.eks.cluster_endpoint
-    ca_data         = module.eks.cluster_certificate_authority_data
-    oidc_issuer     = module.eks.cluster_oidc_issuer_url
-  }
-  sensitive = true
+output "private_subnet_ids" {
+  description = "IDs of the private subnets"
+  value       = module.vpc.private_subnet_ids
+}
+
+output "public_subnet_ids" {
+  description = "IDs of the public subnets"
+  value       = module.vpc.public_subnet_ids
+}
+
+# EKS Outputs
+output "cluster_id" {
+  description = "EKS cluster ID"
+  value       = module.eks.cluster_id
+}
+
+output "cluster_arn" {
+  description = "EKS cluster ARN"
+  value       = module.eks.cluster_arn
+}
+
+output "cluster_endpoint" {
+  description = "Endpoint for EKS control plane"
+  value       = module.eks.cluster_endpoint
+}
+
+output "cluster_security_group_id" {
+  description = "Security group ids attached to the cluster control plane"
+  value       = module.eks.cluster_security_group_id
+}
+
+output "cluster_oidc_issuer_url" {
+  description = "The URL on the EKS cluster for the OpenID Connect identity provider"
+  value       = module.eks.cluster_oidc_issuer_url
 }
 
 # Database Outputs
-output "database_endpoints" {
-  description = "Database connection endpoints"
-  value = {
-    postgresql = module.rds.postgresql_endpoint
-    mysql      = module.rds.mysql_endpoint
-    redis      = module.elasticache.redis_endpoint
-  }
+output "postgresql_endpoint" {
+  description = "RDS PostgreSQL instance endpoint"
+  value       = module.rds.postgresql_endpoint
+  sensitive   = true
 }
 
-output "dynamodb_tables" {
-  description = "DynamoDB table names"
+output "mysql_endpoint" {
+  description = "RDS MySQL instance endpoint"
+  value       = module.rds.mysql_endpoint
+  sensitive   = true
+}
+
+output "redis_endpoint" {
+  description = "ElastiCache Redis endpoint"
+  value       = module.elasticache.redis_endpoint
+  sensitive   = true
+}
+
+output "dynamodb_table_names" {
+  description = "Names of the DynamoDB tables"
   value       = module.dynamodb.table_names
-}
-
-output "secrets_manager" {
-  description = "AWS Secrets Manager secret names"
-  value       = module.secrets_manager.secret_names
 }
 
 # GitHub Actions Output
 output "github_actions_role_arn" {
   description = "ARN of the GitHub Actions IAM role"
   value       = module.github_actions.github_actions_role_arn
+}
+
+# Readonly User Output
+output "readonly_user_credentials" {
+  description = "Readonly user access credentials"
+  value = {
+    user_name         = module.readonly_user.user_name
+    user_arn          = module.readonly_user.user_arn
+    access_key_id     = module.readonly_user.access_key_id
+    secret_access_key = module.readonly_user.secret_access_key
+  }
+  sensitive   = true
+}
+
+# AWS Auth ConfigMap
+output "aws_auth_configmap" {
+  description = "AWS auth ConfigMap for kubectl access"
+  value = {
+    configmap_name      = module.aws_auth.configmap_name
+    configmap_namespace = module.aws_auth.configmap_namespace
+  }
 }

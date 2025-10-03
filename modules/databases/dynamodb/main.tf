@@ -1,10 +1,10 @@
 resource "aws_dynamodb_table" "microservices_tables" {
   for_each = var.dynamodb_tables
 
-  name           = "${var.cluster_name}-${each.key}"
-  billing_mode   = each.value.billing_mode
-  hash_key       = each.value.hash_key
-  range_key      = each.value.range_key
+  name         = "${var.cluster_name}-${each.key}"
+  billing_mode = each.value.billing_mode
+  hash_key     = each.value.hash_key
+  range_key    = each.value.range_key
 
   read_capacity  = each.value.billing_mode == "PROVISIONED" ? each.value.read_capacity : null
   write_capacity = each.value.billing_mode == "PROVISIONED" ? each.value.write_capacity : null
@@ -24,7 +24,7 @@ resource "aws_dynamodb_table" "microservices_tables" {
       hash_key        = global_secondary_index.value.hash_key
       range_key       = global_secondary_index.value.range_key
       projection_type = global_secondary_index.value.projection_type
-      
+
       read_capacity  = each.value.billing_mode == "PROVISIONED" ? global_secondary_index.value.read_capacity : null
       write_capacity = each.value.billing_mode == "PROVISIONED" ? global_secondary_index.value.write_capacity : null
     }

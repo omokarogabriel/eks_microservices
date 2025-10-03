@@ -16,10 +16,21 @@ spec:
       labels:
         {{- include "microservice.selectorLabels" . | nindent 8 }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+              - ALL
           ports:
             - name: http
               containerPort: {{ .Values.app.port }}
@@ -38,6 +49,10 @@ spec:
             {{- if .Values.database.mysql.host }}
             - name: RETAIL_CATALOG_PERSISTENCE_ENDPOINT
               value: "{{ .Values.database.mysql.host }}:3306"
+            - name: RETAIL_CATALOG_PERSISTENCE_NAME
+              value: {{ .Values.database.mysql.database | quote }}
+            - name: RETAIL_CATALOG_PERSISTENCE_USERNAME
+              value: {{ .Values.database.mysql.username | quote }}
             - name: RETAIL_CATALOG_PERSISTENCE_PASSWORD
               value: {{ .Values.database.mysql.password | quote }}
             {{- end }}
@@ -51,7 +66,7 @@ spec:
             {{- end }}
             {{- if .Values.database.dynamodb.enabled }}
             - name: AWS_DEFAULT_REGION
-              value: "us-east-1"
+              value: {{ .Values.aws.region | default "us-east-1" | quote }}
             {{- end }}
             {{- range .Values.app.env }}
             - name: {{ .name }}

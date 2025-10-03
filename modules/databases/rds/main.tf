@@ -40,12 +40,12 @@ resource "aws_db_instance" "postgresql" {
   engine         = "postgres"
   engine_version = "15.4"
   instance_class = var.postgresql_instance_class
-  
+
   allocated_storage     = var.postgresql_allocated_storage
   max_allocated_storage = var.postgresql_max_allocated_storage
   storage_type          = "gp3"
   storage_encrypted     = true
-  kms_key_id           = var.kms_key_arn
+  kms_key_id            = var.kms_key_arn
 
   db_name  = var.postgresql_db_name
   username = var.postgresql_username
@@ -56,8 +56,8 @@ resource "aws_db_instance" "postgresql" {
   parameter_group_name   = aws_db_parameter_group.postgresql[0].name
 
   backup_retention_period = var.backup_retention_period
-  backup_window          = "03:00-04:00"
-  maintenance_window     = "sun:04:00-sun:05:00"
+  backup_window           = "03:00-04:00"
+  maintenance_window      = "sun:04:00-sun:05:00"
 
   skip_final_snapshot = var.environment == "dev"
   deletion_protection = var.environment == "prod"
@@ -75,12 +75,12 @@ resource "aws_db_instance" "mysql" {
   engine         = "mysql"
   engine_version = "8.0.35"
   instance_class = var.mysql_instance_class
-  
+
   allocated_storage     = var.mysql_allocated_storage
   max_allocated_storage = var.mysql_max_allocated_storage
   storage_type          = "gp3"
   storage_encrypted     = true
-  kms_key_id           = var.kms_key_arn
+  kms_key_id            = var.kms_key_arn
 
   db_name  = var.mysql_db_name
   username = var.mysql_username
@@ -91,8 +91,8 @@ resource "aws_db_instance" "mysql" {
   parameter_group_name   = aws_db_parameter_group.mysql[0].name
 
   backup_retention_period = var.backup_retention_period
-  backup_window          = "03:00-04:00"
-  maintenance_window     = "sun:04:00-sun:05:00"
+  backup_window           = "03:00-04:00"
+  maintenance_window      = "sun:04:00-sun:05:00"
 
   skip_final_snapshot = var.environment == "dev"
   deletion_protection = var.environment == "prod"

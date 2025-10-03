@@ -49,7 +49,7 @@ resource "aws_eks_cluster" "this" {
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name = aws_eks_cluster.this.name
   addon_name   = "vpc-cni"
-  
+
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-vpc-cni"
   })
@@ -58,9 +58,9 @@ resource "aws_eks_addon" "vpc_cni" {
 resource "aws_eks_addon" "coredns" {
   cluster_name = aws_eks_cluster.this.name
   addon_name   = "coredns"
-  
+
   depends_on = [aws_eks_node_group.this]
-  
+
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-coredns"
   })
@@ -69,7 +69,7 @@ resource "aws_eks_addon" "coredns" {
 resource "aws_eks_addon" "kube_proxy" {
   cluster_name = aws_eks_cluster.this.name
   addon_name   = "kube-proxy"
-  
+
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-kube-proxy"
   })
@@ -79,7 +79,7 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   cluster_name             = aws_eks_cluster.this.name
   addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = var.ebs_csi_role_arn
-  
+
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-ebs-csi-driver"
   })
@@ -99,7 +99,7 @@ resource "aws_eks_node_group" "this" {
 
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-node-group"
-  }) 
+  })
 
   scaling_config {
     desired_size = var.desired_size

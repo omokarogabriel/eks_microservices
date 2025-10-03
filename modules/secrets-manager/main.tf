@@ -3,13 +3,13 @@ resource "aws_secretsmanager_secret" "database_secrets" {
 
   name                    = "${var.cluster_name}-${each.key}-credentials"
   description             = "Database credentials for ${each.key}"
-  kms_key_id             = var.kms_key_arn
+  kms_key_id              = var.kms_key_arn
   recovery_window_in_days = var.recovery_window_in_days
 
   tags = merge(var.common_tags, {
-    Name        = "${var.cluster_name}-${each.key}-credentials"
-    Type        = "database-secret"
-    Database    = each.key
+    Name     = "${var.cluster_name}-${each.key}-credentials"
+    Type     = "database-secret"
+    Database = each.key
   })
 }
 
