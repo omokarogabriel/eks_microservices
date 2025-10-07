@@ -173,3 +173,16 @@ module "oidc" {
 
   depends_on = [module.eks]
 }
+
+module "irsa_roles" {
+  source = "../../modules/irsa-roles"
+
+  cluster_name      = var.cluster_name
+  oidc_provider_arn = module.oidc.oidc_provider_arn
+  oidc_provider_url = module.oidc.oidc_provider_url
+  namespace         = "retail-store-dev"
+  region            = var.region
+  common_tags       = local.common_tags
+
+  depends_on = [module.oidc]
+}

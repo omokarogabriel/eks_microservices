@@ -1,0 +1,82 @@
+repositories:
+  - name: stable
+    url: https://charts.helm.sh/stable
+
+---
+environments:
+  dev:
+    values:
+      - environment: dev
+      - namespace: retail-store-dev
+  staging:
+    values:
+      - environment: staging
+      - namespace: retail-store-staging
+  prod:
+    values:
+      - environment: prod
+      - namespace: retail-store-prod
+
+---
+releases:
+  - name: cart
+    chart: ./helm-chart
+    namespace: '{{ .Values.namespace }}'
+    values:
+      - ./helm-chart/microservices/cart/values.yaml
+    set:
+      - name: irsa.roleArn
+        value: '{{ requiredEnv "CART_ROLE_ARN" }}'
+      - name: database.redis.host
+        value: '{{ requiredEnv "REDIS_HOST" }}'
+      - name: database.redis.password
+        value: '{{ requiredEnv "REDIS_PASSWORD" }}'
+
+  - name: catalog
+    chart: ./helm-chart
+    namespace: '{{ .Values.namespace }}'
+    values:
+      - ./helm-chart/microservices/catalog/values.yaml
+    set:
+      - name: irsa.roleArn
+        value: '{{ requiredEnv "CATALOG_ROLE_ARN" }}'
+      - name: database.mysql.host
+        value: '{{ requiredEnv "MYSQL_HOST" }}'
+      - name: database.mysql.username
+        value: '{{ requiredEnv "MYSQL_USERNAME" }}'
+      - name: database.mysql.password
+        value: '{{ requiredEnv "MYSQL_PASSWORD" }}'
+
+  - name: order
+    chart: ./helm-chart
+    namespace: '{{ .Values.namespace }}'
+    values:
+      - ./helm-chart/microservices/order/values.yaml
+    set:
+      - name: irsa.roleArn
+        value: '{{ requiredEnv "ORDER_ROLE_ARN" }}'
+      - name: database.postgresql.host
+        value: '{{ requiredEnv "POSTGRES_HOST" }}'
+      - name: database.postgresql.username
+        value: '{{ requiredEnv "POSTGRES_USERNAME" }}'
+      - name: database.postgresql.password
+        value: '{{ requiredEnv "POSTGRES_PASSWORD" }}'
+
+  - name: checkout
+    chart: ./helm-chart
+    namespace: '{{ .Values.namespace }}'
+    values:
+      - ./helm-chart/microservices/checkout/values.yaml
+    set:
+      - name: irsa.roleArn
+        value: '{{ requiredEnv "CHECKOUT_ROLE_ARN" }}'
+      - name: database.redis.host
+        value: '{{ requiredEnv "REDIS_HOST" }}'
+      - name: database.redis.password
+        value: '{{ requiredEnv "REDIS_PASSWORD" }}'
+
+  - name: ui
+    chart: ./helm-chart
+    namespace: '{{ .Values.namespace }}'
+    values:
+      - ./helm-chart/microservices/ui/values.yaml

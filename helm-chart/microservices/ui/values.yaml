@@ -1,6 +1,6 @@
 serviceName: "ui"
 namespace: "retail-store"
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: public.ecr.aws/aws-containers/retail-store-sample-ui
@@ -25,6 +25,7 @@ app:
       value: "http://checkout:8080"
 
 service:
+  type: LoadBalancer
   port: 80
 
 ingress:

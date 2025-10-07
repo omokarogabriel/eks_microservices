@@ -16,6 +16,7 @@ spec:
       labels:
         {{- include "microservice.selectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "microservice.fullname" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -35,6 +36,9 @@ spec:
             - name: http
               containerPort: {{ .Values.app.port }}
               protocol: TCP
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
             {{- if .Values.database.postgresql.host }}
             - name: RETAIL_ORDERS_PERSISTENCE_ENDPOINT
@@ -42,9 +46,15 @@ spec:
             - name: RETAIL_ORDERS_PERSISTENCE_NAME
               value: {{ .Values.database.postgresql.database | quote }}
             - name: RETAIL_ORDERS_PERSISTENCE_USERNAME
-              value: {{ .Values.database.postgresql.username | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservice.fullname" . }}-db-secret
+                  key: postgresql-username
             - name: RETAIL_ORDERS_PERSISTENCE_PASSWORD
-              value: {{ .Values.database.postgresql.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservice.fullname" . }}-db-secret
+                  key: postgresql-password
             {{- end }}
             {{- if .Values.database.mysql.host }}
             - name: RETAIL_CATALOG_PERSISTENCE_ENDPOINT
@@ -52,19 +62,28 @@ spec:
             - name: RETAIL_CATALOG_PERSISTENCE_NAME
               value: {{ .Values.database.mysql.database | quote }}
             - name: RETAIL_CATALOG_PERSISTENCE_USERNAME
-              value: {{ .Values.database.mysql.username | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservice.fullname" . }}-db-secret
+                  key: mysql-username
             - name: RETAIL_CATALOG_PERSISTENCE_PASSWORD
-              value: {{ .Values.database.mysql.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservice.fullname" . }}-db-secret
+                  key: mysql-password
             {{- end }}
             {{- if .Values.database.redis.host }}
             - name: REDIS_HOST
               value: {{ .Values.database.redis.host | quote }}
             - name: REDIS_PASSWORD
-              value: {{ .Values.database.redis.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservice.fullname" . }}-db-secret
+                  key: redis-password
             - name: RETAIL_CHECKOUT_PERSISTENCE_REDIS_URL
               value: "redis://{{ .Values.database.redis.host }}:6379"
             {{- end }}
-            {{- if .Values.database.dynamodb.enabled }}
+            {{- if and .Values.database.dynamodb .Values.database.dynamodb.enabled }}
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.aws.region | default "us-east-1" | quote }}
             {{- end }}
@@ -86,6 +105,9 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

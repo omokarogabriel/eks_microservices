@@ -78,3 +78,14 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Service Account Configuration
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+
+# IRSA Configuration
+irsa:
+  enabled: false
+  roleArn: ""

@@ -1,6 +1,6 @@
 serviceName: "checkout"
 namespace: "retail-store"
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: public.ecr.aws/aws-containers/retail-store-sample-checkout
@@ -37,3 +37,8 @@ database:
   redis:
     host: ""
     password: ""
+
+# IRSA Configuration
+irsa:
+  enabled: true
+  roleArn: ""  # Will be set via --set during deployment

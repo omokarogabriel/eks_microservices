@@ -7,7 +7,7 @@ set -e
 
 REGION="us-east-1"
 VPC_ID="vpc-011fd6014a33a3da2"
-IGW_ID="igw-0a846d98e7a661b6a"
+IGW_ID="igw-0593ff39fdc1cb94c"
 
 echo "🔧 Fixing Network Dependencies"
 echo "VPC: $VPC_ID"

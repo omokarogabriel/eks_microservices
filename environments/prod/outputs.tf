@@ -90,3 +90,24 @@ output "aws_auth_configmap" {
     configmap_namespace = module.aws_auth.configmap_namespace
   }
 }
+
+# IRSA Role ARNs
+output "cart_service_role_arn" {
+  description = "ARN of the cart service IAM role"
+  value       = module.irsa_roles.cart_service_role_arn
+}
+
+output "catalog_service_role_arn" {
+  description = "ARN of the catalog service IAM role"
+  value       = module.irsa_roles.catalog_service_role_arn
+}
+
+output "order_service_role_arn" {
+  description = "ARN of the order service IAM role"
+  value       = module.irsa_roles.order_service_role_arn
+}
+
+output "checkout_service_role_arn" {
+  description = "ARN of the checkout service IAM role"
+  value       = module.irsa_roles.checkout_service_role_arn
+}

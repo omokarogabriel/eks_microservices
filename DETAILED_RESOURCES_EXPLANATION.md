@@ -347,7 +347,61 @@ resource "aws_secretsmanager_secret" "database_secrets"
 - Port numbers
 - Database names
 **Security**: KMS encryption, fine-grained access control.
-**Integration**: Applications retrieve secrets at runtime (no hardcoded credentials).
+**Integration**: Applications retrieve secrets at runtime via IRSA (no hardcoded credentials).
+
+## 🔐 IRSA Roles Module - Service-Specific IAM Roles
+
+### **Cart Service Role**
+```hcl
+resource "aws_iam_role" "cart_service_role"
+```
+**What it does**: Provides cart service with DynamoDB and Secrets Manager access.
+**Permissions**:
+- DynamoDB read/write operations on cart tables
+- Secrets Manager read access for database credentials
+- OIDC trust policy for service account authentication
+**Trust relationship**: Only cart service account can assume this role.
+
+### **Catalog Service Role**
+```hcl
+resource "aws_iam_role" "catalog_service_role"
+```
+**What it does**: Provides catalog service with DynamoDB and Secrets Manager access.
+**Permissions**:
+- DynamoDB read/write operations on catalog tables
+- Secrets Manager read access for database credentials
+- OIDC trust policy for service account authentication
+
+### **Order Service Role**
+```hcl
+resource "aws_iam_role" "order_service_role"
+```
+**What it does**: Provides order service with PostgreSQL and Secrets Manager access.
+**Permissions**:
+- Secrets Manager read access for PostgreSQL credentials
+- OIDC trust policy for service account authentication
+**Database**: Connects to PostgreSQL via retrieved credentials.
+
+### **Checkout Service Role**
+```hcl
+resource "aws_iam_role" "checkout_service_role"
+```
+**What it does**: Provides checkout service with Redis and Secrets Manager access.
+**Permissions**:
+- Secrets Manager read access for Redis credentials
+- OIDC trust policy for service account authentication
+**Database**: Connects to ElastiCache Redis via retrieved credentials.
+
+### **OIDC Trust Policies**
+```hcl
+data "aws_iam_policy_document" "irsa_trust_policy"
+```
+**What they do**: Define which Kubernetes service accounts can assume each role.
+**Security features**:
+- Environment-specific role isolation
+- Service-specific permissions (least privilege)
+- No long-term AWS credentials in pods
+- Automatic credential rotation via STS tokens
 
 ## 🔗 OIDC Module - Service Account Authentication
 
@@ -362,6 +416,18 @@ resource "aws_iam_openid_connect_identity_provider" "eks"
 3. AWS STS exchanges tokens for temporary AWS credentials
 4. Applications use temporary credentials to access AWS services
 **Benefits**: No AWS credentials stored in pods, fine-grained permissions.
+
+### **Service Account Integration**
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/cart-service-role
+```
+**What it does**: Links Kubernetes service accounts to IAM roles.
+**Automatic injection**: Helmfile automatically injects role ARNs per environment.
+**Security**: Each microservice gets dedicated IAM role with minimal permissions.
 
 ## 👥 AWS Auth Module - Kubernetes RBAC
 
@@ -415,6 +481,93 @@ resource "aws_iam_role" "github_actions"
 - Secrets Manager read
 - Scoped to specific cluster resources
 
+## 📦 Helm Chart & Helmfile - Application Deployment
+
+### **Shared Helm Chart** (`helm-chart/`)
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+```
+**What it does**: Provides secure, reusable templates for all microservices.
+**Security features**:
+- **Non-root execution**: All containers run as UID 1000
+- **Read-only filesystem**: Immutable runtime environment
+- **Dropped capabilities**: Minimal Linux capabilities (ALL dropped)
+- **Privilege escalation prevention**: Enhanced security
+
+### **Service Account Template**
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    {{- if .Values.irsa.enabled }}
+    eks.amazonaws.com/role-arn: {{ .Values.irsa.roleArn }}
+    {{- end }}
+```
+**What it does**: Automatically configures IRSA for each microservice.
+**Integration**: Helmfile injects environment-specific role ARNs.
+
+### **Database Secret Template**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.serviceName }}-db-secret
+data:
+  {{- range $key, $value := .Values.database.secrets }}
+  {{ $key }}: {{ $value | b64enc }}
+  {{- end }}
+```
+**What it does**: Creates Kubernetes secrets from database credentials.
+**Security**: Credentials retrieved from AWS Secrets Manager via IRSA.
+
+### **Helmfile Configuration** (`helmfile.yaml`)
+```yaml
+releases:
+- name: cart
+  chart: ./helm-chart
+  values:
+  - ./helm-chart/microservices/cart/values.yaml
+  set:
+  - name: irsa.roleArn
+    value: {{ requiredEnv "CART_ROLE_ARN" }}
+```
+**What it does**: Manages multi-environment deployments with automated configuration.
+**Features**:
+- **Environment-aware**: Automatic dev/staging/prod value injection
+- **IRSA integration**: Dynamic role ARN assignment per service
+- **Credential management**: Automated database secret retrieval
+- **Namespace management**: Automatic retail-store namespace creation
+
+### **Deployment Automation** (`deploy-helmfile.sh`)
+```bash
+#!/bin/bash
+ENVIRONMENT=$1
+
+# Get IRSA role ARNs from Terraform
+export CART_ROLE_ARN=$(terraform output -raw cart_service_role_arn)
+export CATALOG_ROLE_ARN=$(terraform output -raw catalog_service_role_arn)
+
+# Deploy with environment-specific values
+helmfile -e $ENVIRONMENT apply
+```
+**What it does**: Automates deployment with secure credential injection.
+**Integration**: Works with both local development and GitHub Actions.
+
 ## 🏷️ Tagging Strategy
 
 ### **Common Tags**
@@ -440,7 +593,9 @@ Applied to all resources for:
 6. **Node Groups** → Depend on EKS cluster
 7. **Databases** → Use VPC subnets and security groups
 8. **OIDC** → Depends on EKS cluster
-9. **AWS Auth** → Depends on EKS cluster and IAM roles
+9. **IRSA Roles** → Depend on OIDC provider and databases
+10. **AWS Auth** → Depends on EKS cluster and IAM roles
+11. **Helmfile** → Depends on IRSA roles and database secrets
 
 ## 🎯 Environment-Specific Configurations
 
@@ -465,5 +620,78 @@ Applied to all resources for:
 - Long log retention (30 days)
 - Required backups with cross-region replication
 - Deletion protection enabled
+- Enhanced security contexts
+- Full IRSA implementation
 
-This infrastructure provides a production-ready, secure, and scalable foundation for running microservices on Amazon EKS with comprehensive monitoring, security, and operational capabilities.
+## 🔍 Microservice-Specific Configurations
+
+### **Cart Service**:
+- **Database**: DynamoDB tables for shopping cart data
+- **IRSA Role**: DynamoDB read/write, Secrets Manager read
+- **Security Context**: Non-root (UID 1000), read-only filesystem
+- **Resources**: CPU/memory limits with HPA scaling
+
+### **Catalog Service**:
+- **Database**: DynamoDB tables for product catalog
+- **IRSA Role**: DynamoDB read/write, Secrets Manager read
+- **Security Context**: Non-root (UID 1000), read-only filesystem
+- **Resources**: CPU/memory limits with HPA scaling
+
+### **Order Service**:
+- **Database**: PostgreSQL for order management
+- **IRSA Role**: Secrets Manager read for PostgreSQL credentials
+- **Security Context**: Non-root (UID 1000), read-only filesystem
+- **Resources**: CPU/memory limits with HPA scaling
+
+### **Checkout Service**:
+- **Database**: ElastiCache Redis for session management
+- **IRSA Role**: Secrets Manager read for Redis credentials
+- **Security Context**: Non-root (UID 1000), read-only filesystem
+- **Resources**: CPU/memory limits with HPA scaling
+
+### **UI Service**:
+- **Purpose**: Frontend application serving the retail store interface
+- **Security Context**: Non-root (UID 1000), read-only filesystem
+- **Resources**: CPU/memory limits with HPA scaling
+- **Ingress**: ALB integration for public access
+
+## 🛡️ Security Architecture
+
+### **Defense in Depth**:
+1. **Network Security**: VPC isolation, private subnets, security groups
+2. **Container Security**: Non-root execution, read-only filesystems, dropped capabilities
+3. **Identity Security**: IRSA with service-specific roles, OIDC authentication
+4. **Data Security**: KMS encryption, Secrets Manager, secure credential injection
+5. **Access Security**: RBAC, least-privilege permissions, temporary credentials
+
+### **Zero-Trust Principles**:
+- **No long-term credentials**: All authentication via temporary tokens
+- **Service isolation**: Each microservice has dedicated IAM role
+- **Encrypted communication**: TLS everywhere, encrypted storage
+- **Audit trail**: Complete logging and monitoring
+- **Principle of least privilege**: Minimal permissions per service
+
+## 🚀 Deployment Workflows
+
+### **Infrastructure + Helmfile (Recommended)**:
+1. **Terraform**: Creates infrastructure with IRSA roles
+2. **Automatic trigger**: Helmfile deployment starts after infrastructure
+3. **IRSA injection**: Role ARNs automatically injected per environment
+4. **Credential retrieval**: Database secrets fetched via IRSA
+5. **Secure deployment**: All microservices deployed with proper security contexts
+
+### **Helmfile Only**:
+1. **Environment detection**: Automatic dev/staging/prod configuration
+2. **Role injection**: IRSA roles retrieved from existing infrastructure
+3. **Credential management**: Secure database connection setup
+4. **Health checks**: Automated deployment validation
+
+### **Local Development**:
+```bash
+# Deploy to specific environment
+./deploy-helmfile.sh dev
+./deploy-helmfile.sh staging
+./deploy-helmfile.sh prod
+```
+
+This infrastructure provides a production-ready, secure, and scalable foundation for running microservices on Amazon EKS with comprehensive IRSA security, automated Helmfile deployment, container hardening, and operational capabilities.

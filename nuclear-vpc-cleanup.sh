@@ -4,7 +4,7 @@
 set -e
 
 REGION="us-east-1"
-VPC_ID="vpc-011fd6014a33a3da2"
+VPC_ID="vpc-0fba9a19dba37178e"
 
 echo "☢️  NUCLEAR VPC CLEANUP - Removing ALL dependencies"
 echo "VPC: $VPC_ID"

@@ -4,10 +4,10 @@
 set -e
 
 REGION="us-east-1"
-VPC_ID="vpc-011fd6014a33a3da2"
-SUBNET1="subnet-06b1f7babca1c287b"
-SUBNET2="subnet-074a8b959008df731"
-IGW_ID="igw-0a846d98e7a661b6a"
+VPC_ID="vpc-0fba9a19dba37178e"
+SUBNET1="subnet-019a4b44b9ffc4a1f"
+SUBNET2="subnet-016224fd9528abf30"
+IGW_ID="igw-0593ff39fdc1cb94c"
 
 echo "🔥 Force Cleanup Subnets - Aggressive Mode"
 echo "VPC: $VPC_ID"

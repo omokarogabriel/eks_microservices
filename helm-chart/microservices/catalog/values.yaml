@@ -1,6 +1,6 @@
 serviceName: "catalog"
 namespace: "retail-store"
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: public.ecr.aws/aws-containers/retail-store-sample-catalog
@@ -21,16 +21,16 @@ service:
 
 resources:
   limits:
-    cpu: 750m
-    memory: 768Mi
+    cpu: 200m
+    memory: 256Mi
   requests:
-    cpu: 375m
-    memory: 384Mi
+    cpu: 100m
+    memory: 128Mi
 
 autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
   targetCPUUtilizationPercentage: 75
 
 database:
@@ -39,3 +39,8 @@ database:
     username: ""
     password: ""
     database: "catalog"
+
+# IRSA Configuration
+irsa:
+  enabled: true
+  roleArn: ""  # Will be set via --set during deployment

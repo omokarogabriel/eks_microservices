@@ -1,6 +1,6 @@
 serviceName: "cart"
 namespace: "retail-store"
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: public.ecr.aws/aws-containers/retail-store-sample-cart
@@ -21,16 +21,16 @@ service:
 
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 250m
+    cpu: 200m
     memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
 
 autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 8
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
   targetCPUUtilizationPercentage: 70
 
 database:
@@ -39,3 +39,8 @@ database:
   redis:
     host: ""
     password: ""
+
+# IRSA Configuration
+irsa:
+  enabled: true
+  roleArn: ""  # Will be set via --set during deployment
