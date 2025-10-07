@@ -1,0 +1,146 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+      confirmation:
+        description: 'Type "DESTROY" to confirm'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  cleanup-dependencies:
+    if: github.event.inputs.confirmation == 'DESTROY'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ github.event.inputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || github.event.inputs.environment == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Set cluster name
+      run: |
+        if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+          echo "CLUSTER_NAME=retail-store-dev" >> $GITHUB_ENV
+        elif [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+          echo "CLUSTER_NAME=retail-store-staging" >> $GITHUB_ENV
+        else
+          echo "CLUSTER_NAME=retail-store-prod" >> $GITHUB_ENV
+        fi
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }} || echo "Cluster may not exist"
+
+    - name: Clean up Kubernetes resources
+      run: |
+        # Delete all Helm releases in the namespace
+        helm list --namespace retail-store-${{ github.event.inputs.environment }} -q | xargs -r -I {} helm uninstall {} --namespace retail-store-${{ github.event.inputs.environment }} || true
+        
+        # Delete Load Balancers (to release ALB/NLB)
+        kubectl delete svc --all --all-namespaces --selector=service.beta.kubernetes.io/aws-load-balancer-type || true
+        kubectl delete ingress --all --all-namespaces || true
+        
+        # Delete PVCs (to release EBS volumes)
+        kubectl delete pvc --all --all-namespaces || true
+        
+        # Delete namespaces
+        kubectl delete namespace retail-store-${{ github.event.inputs.environment }} || true
+        
+        # Wait for resources to be cleaned up
+        sleep 60
+
+    - name: Clean up AWS Load Balancers
+      run: |
+        # Get and delete ALBs created by ingress controller
+        ALB_ARNS=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?contains(LoadBalancerName, 'k8s-')].LoadBalancerArn" --output text)
+        for arn in $ALB_ARNS; do
+          echo "Deleting ALB: $arn"
+          aws elbv2 delete-load-balancer --load-balancer-arn $arn || true
+        done
+
+    - name: Clean up ENIs and EBS volumes
+      run: |
+        # Delete unattached ENIs
+        ENI_IDS=$(aws ec2 describe-network-interfaces --filters "Name=status,Values=available" "Name=description,Values=*${{ env.CLUSTER_NAME }}*" --query "NetworkInterfaces[].NetworkInterfaceId" --output text)
+        for eni_id in $ENI_IDS; do
+          echo "Deleting ENI: $eni_id"
+          aws ec2 delete-network-interface --network-interface-id $eni_id || true
+        done
+        
+        # Delete available EBS volumes
+        VOLUME_IDS=$(aws ec2 describe-volumes --filters "Name=status,Values=available" "Name=tag:kubernetes.io/cluster/${{ env.CLUSTER_NAME }},Values=owned" --query "Volumes[].VolumeId" --output text)
+        for volume_id in $VOLUME_IDS; do
+          echo "Deleting EBS volume: $volume_id"
+          aws ec2 delete-volume --volume-id $volume_id || true
+        done
+
+    - name: Wait for cleanup completion
+      run: |
+        echo "Waiting for AWS resources to be fully cleaned up..."
+        sleep 120
+
+  terraform-destroy:
+    needs: cleanup-dependencies
+    if: github.event.inputs.confirmation == 'DESTROY' && needs.cleanup-dependencies.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ github.event.inputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || github.event.inputs.environment == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Verify backend exists
+      run: |
+        # Check if S3 bucket exists
+        if ! aws s3api head-bucket --bucket microservices-eks-terraform-state 2>/dev/null; then
+          echo "⚠️ Backend S3 bucket does not exist - nothing to destroy"
+          exit 0
+        fi
+        echo "✅ Backend resources found"
+
+    - name: Terraform Init
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform init
+
+    - name: Terraform Destroy
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform destroy -auto-approve
+
+    - name: Confirm destruction
+      run: |
+        echo "✅ Infrastructure destroyed successfully for ${{ github.event.inputs.environment }} environment"
+        echo "All resources have been removed from AWS"

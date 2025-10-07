@@ -1,7 +1,7 @@
 variable "vpc_cidr" {
   description = "The CIDR block for the VPC"
   type        = string
-  
+
   validation {
     condition     = can(cidrhost(var.vpc_cidr, 0))
     error_message = "VPC CIDR must be a valid IPv4 CIDR block."
@@ -16,7 +16,7 @@ variable "env_name" {
 variable "public_subnet_cidrs" {
   description = "List of public subnet CIDR blocks"
   type        = list(string)
-  
+
   validation {
     condition     = length(var.public_subnet_cidrs) >= 2
     error_message = "At least 2 public subnets are required for high availability."
@@ -26,7 +26,7 @@ variable "public_subnet_cidrs" {
 variable "private_subnet_cidrs" {
   description = "List of private subnet CIDR blocks"
   type        = list(string)
-  
+
   validation {
     condition     = length(var.private_subnet_cidrs) >= 2
     error_message = "At least 2 private subnets are required for high availability."

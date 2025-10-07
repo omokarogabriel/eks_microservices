@@ -29,27 +29,35 @@ microservices/                # Service-specific configurations
 - **Scaling**: 2-8 replicas
 - **Purpose**: Shopping cart management
 - **Image**: `public.ecr.aws/aws-containers/retail-store-sample-cart:1.2.4`
+- **Health**: `/actuator/health`
+- **Security**: Non-root user, read-only filesystem
 
 ### Catalog Service  
-- **Database**: MySQL
+- **Database**: MySQL (with username, database name)
 - **Resources**: 375m CPU, 384Mi Memory
 - **Scaling**: 2-10 replicas
 - **Purpose**: Product catalog and inventory
 - **Image**: `public.ecr.aws/aws-containers/retail-store-sample-catalog:1.2.4`
+- **Health**: `/health`
+- **Security**: Non-root user, read-only filesystem
 
 ### Order Service
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (complete configuration)
 - **Resources**: 500m CPU, 512Mi Memory  
 - **Scaling**: 2-12 replicas
 - **Purpose**: Order management and processing
 - **Image**: `public.ecr.aws/aws-containers/retail-store-sample-orders:1.2.4`
+- **Health**: `/actuator/health`
+- **Security**: Non-root user, read-only filesystem
 
 ### Checkout Service
-- **Database**: Redis
+- **Database**: Redis (with proper URL format)
 - **Resources**: 250m CPU, 256Mi Memory
 - **Scaling**: 2-6 replicas
 - **Purpose**: Checkout processing
 - **Image**: `public.ecr.aws/aws-containers/retail-store-sample-checkout:1.2.4`
+- **Health**: `/health`
+- **Security**: Non-root user, read-only filesystem
 
 ### UI Service
 - **Database**: None (Frontend)
@@ -57,7 +65,9 @@ microservices/                # Service-specific configurations
 - **Scaling**: 2-8 replicas
 - **Purpose**: Web frontend interface
 - **Image**: `public.ecr.aws/aws-containers/retail-store-sample-ui:1.2.4`
+- **Health**: `/actuator/health`
 - **Ingress**: ALB with internet-facing access
+- **Security**: Non-root user, read-only filesystem
 
 ## 📦 Deployment
 
@@ -71,26 +81,37 @@ All microservices deploy automatically with:
 ```bash
 # Deploy Cart Service
 helm upgrade --install cart ./helm-chart \
+  --namespace retail-store-dev \
   --values ./microservices/cart/values.yaml \
-  --set database.redis.host=$REDIS_HOST
+  --set database.redis.host=$REDIS_HOST \
+  --set database.redis.password=$REDIS_PASSWORD
 
 # Deploy Catalog Service  
 helm upgrade --install catalog ./helm-chart \
+  --namespace retail-store-dev \
   --values ./microservices/catalog/values.yaml \
-  --set database.mysql.host=$MYSQL_HOST
+  --set database.mysql.host=$MYSQL_HOST \
+  --set database.mysql.username=$MYSQL_USERNAME \
+  --set database.mysql.password=$MYSQL_PASSWORD
 
 # Deploy Order Service
 helm upgrade --install order ./helm-chart \
+  --namespace retail-store-dev \
   --values ./microservices/order/values.yaml \
-  --set database.postgresql.host=$POSTGRES_HOST
+  --set database.postgresql.host=$POSTGRES_HOST \
+  --set database.postgresql.username=$POSTGRES_USERNAME \
+  --set database.postgresql.password=$POSTGRES_PASSWORD
 
 # Deploy Checkout Service
 helm upgrade --install checkout ./helm-chart \
+  --namespace retail-store-dev \
   --values ./microservices/checkout/values.yaml \
-  --set database.redis.host=$REDIS_HOST
+  --set database.redis.host=$REDIS_HOST \
+  --set database.redis.password=$REDIS_PASSWORD
 
 # Deploy UI Service
 helm upgrade --install ui ./helm-chart \
+  --namespace retail-store-dev \
   --values ./microservices/ui/values.yaml
 ```
 

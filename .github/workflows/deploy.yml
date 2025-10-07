@@ -1,21 +1,23 @@
-name: Deploy to EKS
+name: Deploy to EKS (DISABLED)
 
+# DISABLED: This workflow was automatically deploying to production
+# Use 'Deploy Infrastructure' workflow instead for safe manual deployments
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to'
+        description: "Environment to deploy to"
         required: true
-        default: 'prod'
+        default: "prod"
         type: choice
         options:
-        - dev
-        - staging
-        - prod
+          - dev
+          - staging
+          - prod
 
 env:
   AWS_REGION: us-east-1
@@ -26,89 +28,89 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ENVIRONMENT == 'dev' && secrets.AWS_ROLE_ARN_DEV || env.ENVIRONMENT == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Set environment variables
-      run: |
-        ENV=${{ github.event.inputs.environment || 'prod' }}
-        echo "CLUSTER_NAME=${ENV}-eks-cluster" >> $GITHUB_ENV
-        echo "ENVIRONMENT=${ENV}" >> $GITHUB_ENV
+      - name: Set environment variables
+        run: |
+          ENV=${{ github.event.inputs.environment || 'prod' }}
+          echo "CLUSTER_NAME=${ENV}-eks-cluster" >> $GITHUB_ENV
+          echo "ENVIRONMENT=${ENV}" >> $GITHUB_ENV
 
-    - name: Update kubeconfig
-      run: |
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
-    - name: Get database secrets
-      run: |
-        POSTGRES_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ env.CLUSTER_NAME }}-postgresql-credentials --query SecretString --output text)
-        MYSQL_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ env.CLUSTER_NAME }}-mysql-credentials --query SecretString --output text)
-        REDIS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ env.CLUSTER_NAME }}-redis-credentials --query SecretString --output text)
-        echo "POSTGRES_SECRET=${POSTGRES_SECRET}" >> $GITHUB_ENV
-        echo "MYSQL_SECRET=${MYSQL_SECRET}" >> $GITHUB_ENV
-        echo "REDIS_SECRET=${REDIS_SECRET}" >> $GITHUB_ENV
+      - name: Get database secrets
+        run: |
+          POSTGRES_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ env.CLUSTER_NAME }}-postgresql-credentials --query SecretString --output text)
+          MYSQL_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ env.CLUSTER_NAME }}-mysql-credentials --query SecretString --output text)
+          REDIS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ env.CLUSTER_NAME }}-redis-credentials --query SecretString --output text)
+          echo "POSTGRES_SECRET=${POSTGRES_SECRET}" >> $GITHUB_ENV
+          echo "MYSQL_SECRET=${MYSQL_SECRET}" >> $GITHUB_ENV
+          echo "REDIS_SECRET=${REDIS_SECRET}" >> $GITHUB_ENV
 
-    - name: Install Helm
-      uses: azure/setup-helm@v3
-      with:
-        version: '3.12.0'
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "3.12.0"
 
-    - name: Deploy Gabriel Retail Store
-      run: |
-        # Create namespace
-        kubectl create namespace retail-store-${{ env.ENVIRONMENT }} --dry-run=client -o yaml | kubectl apply -f -
-        
-        # Deploy Cart Service
-        helm upgrade --install cart ./helm-chart \
-          --namespace retail-store-${{ env.ENVIRONMENT }} \
-          --values ./microservices/cart/values.yaml \
-          --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
-          --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
-          --wait --timeout=300s
-        
-        # Deploy Catalog Service
-        helm upgrade --install catalog ./helm-chart \
-          --namespace retail-store-${{ env.ENVIRONMENT }} \
-          --values ./microservices/catalog/values.yaml \
-          --set database.mysql.host=$(echo $MYSQL_SECRET | jq -r '.host') \
-          --set database.mysql.username=$(echo $MYSQL_SECRET | jq -r '.username') \
-          --set database.mysql.password=$(echo $MYSQL_SECRET | jq -r '.password') \
-          --wait --timeout=300s
-        
-        # Deploy Order Service
-        helm upgrade --install order ./helm-chart \
-          --namespace retail-store-${{ env.ENVIRONMENT }} \
-          --values ./microservices/order/values.yaml \
-          --set database.postgresql.host=$(echo $POSTGRES_SECRET | jq -r '.host') \
-          --set database.postgresql.username=$(echo $POSTGRES_SECRET | jq -r '.username') \
-          --set database.postgresql.password=$(echo $POSTGRES_SECRET | jq -r '.password') \
-          --wait --timeout=300s
-        
-        # Deploy Checkout Service
-        helm upgrade --install checkout ./helm-chart \
-          --namespace retail-store-${{ env.ENVIRONMENT }} \
-          --values ./microservices/checkout/values.yaml \
-          --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
-          --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
-          --wait --timeout=300s
-        
-        # Deploy UI Service
-        helm upgrade --install ui ./helm-chart \
-          --namespace retail-store-${{ env.ENVIRONMENT }} \
-          --values ./microservices/ui/values.yaml \
-          --wait --timeout=300s
+      - name: Deploy Gabriel Retail Store
+        run: |
+          # Create namespace
+          kubectl create namespace retail-store-${{ env.ENVIRONMENT }} --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Verify deployments
-      run: |
-        helm list --namespace retail-store-${{ env.ENVIRONMENT }}
-        kubectl get pods --namespace retail-store-${{ env.ENVIRONMENT }}
-        kubectl get svc --namespace retail-store-${{ env.ENVIRONMENT }}
-        kubectl get ingress --namespace retail-store-${{ env.ENVIRONMENT }}
+          # Deploy Cart Service
+          helm upgrade --install cart ./helm-chart \
+            --namespace retail-store-${{ env.ENVIRONMENT }} \
+            --values ./helm-chart/microservices/cart/values.yaml \
+            --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
+            --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
+            --wait --timeout=300s
+
+          # Deploy Catalog Service
+          helm upgrade --install catalog ./helm-chart \
+            --namespace retail-store-${{ env.ENVIRONMENT }} \
+            --values ./helm-chart/microservices/catalog/values.yaml \
+            --set database.mysql.host=$(echo $MYSQL_SECRET | jq -r '.host') \
+            --set database.mysql.username=$(echo $MYSQL_SECRET | jq -r '.username') \
+            --set database.mysql.password=$(echo $MYSQL_SECRET | jq -r '.password') \
+            --wait --timeout=300s
+
+          # Deploy Order Service
+          helm upgrade --install order ./helm-chart \
+            --namespace retail-store-${{ env.ENVIRONMENT }} \
+            --values ./helm-chart/microservices/order/values.yaml \
+            --set database.postgresql.host=$(echo $POSTGRES_SECRET | jq -r '.host') \
+            --set database.postgresql.username=$(echo $POSTGRES_SECRET | jq -r '.username') \
+            --set database.postgresql.password=$(echo $POSTGRES_SECRET | jq -r '.password') \
+            --wait --timeout=300s
+
+          # Deploy Checkout Service
+          helm upgrade --install checkout ./helm-chart \
+            --namespace retail-store-${{ env.ENVIRONMENT }} \
+            --values ./helm-chart/microservices/checkout/values.yaml \
+            --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
+            --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
+            --wait --timeout=300s
+
+          # Deploy UI Service
+          helm upgrade --install ui ./helm-chart \
+            --namespace retail-store-${{ env.ENVIRONMENT }} \
+            --values ./helm-chart/microservices/ui/values.yaml \
+            --wait --timeout=300s
+
+      - name: Verify deployments
+        run: |
+          helm list --namespace retail-store-${{ env.ENVIRONMENT }}
+          kubectl get pods --namespace retail-store-${{ env.ENVIRONMENT }}
+          kubectl get svc --namespace retail-store-${{ env.ENVIRONMENT }}
+          kubectl get ingress --namespace retail-store-${{ env.ENVIRONMENT }}

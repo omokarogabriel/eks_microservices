@@ -24,13 +24,13 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy_attach" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-   
+
 
 
 ###Create EKS worker node IAM role
 resource "aws_iam_role" "eks_worker_role" {
-  name_prefix = "${var.cluster_name}-node-role-"
-    assume_role_policy = <<POLICY
+  name_prefix        = "${var.cluster_name}-node-role-"
+  assume_role_policy = <<POLICY
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -73,7 +73,7 @@ resource "aws_iam_role_policy_attachment" "eks_cni_policy_attach" {
 resource "aws_iam_role" "eks_ebs_csi_driver_role" {
   count       = var.enable_ebs_csi_driver ? 1 : 0
   name_prefix = "${var.cluster_name}-ebs-csi-role-"
-  
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -92,20 +92,20 @@ resource "aws_iam_role" "eks_ebs_csi_driver_role" {
       }
     ]
   })
-  
+
   tags = merge(var.common_tags, {
     Name = "${var.cluster_name}-ebs-csi-role"
     Type = "service-account-role"
   })
-}   
+}
 
 ### Attach the AmazonEBSCSIDriverPolicy to the role
 resource "aws_iam_role_policy_attachment" "eks_ebs_csi_driver_policy_attach" {
   count      = var.enable_ebs_csi_driver ? 1 : 0
   role       = aws_iam_role.eks_ebs_csi_driver_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-}   
+}
 
-   
+
 
 # End of IAM Role for EKS EBS CSI Driver

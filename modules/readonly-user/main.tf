@@ -31,44 +31,34 @@ resource "aws_iam_user_policy" "readonly_eks_policy" {
   })
 }
 
-resource "kubernetes_cluster_role" "readonly" {
-  metadata {
-    name = "eks-readonly"
-  }
-
-  rule {
-    api_groups = [""]
-    resources  = ["*"]
-    verbs      = ["get", "list", "watch"]
-  }
-
-  rule {
-    api_groups = ["apps", "extensions"]
-    resources  = ["*"]
-    verbs      = ["get", "list", "watch"]
-  }
-
-  rule {
-    api_groups = ["batch"]
-    resources  = ["*"]
-    verbs      = ["get", "list", "watch"]
-  }
-}
-
-resource "kubernetes_cluster_role_binding" "readonly" {
-  metadata {
-    name = "eks-readonly-binding"
-  }
-
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "ClusterRole"
-    name      = kubernetes_cluster_role.readonly.metadata[0].name
-  }
-
-  subject {
-    kind      = "User"
-    name      = "readonly-user"
-    api_group = "rbac.authorization.k8s.io"
-  }
-}
+# Kubernetes RBAC resources removed to avoid provider connection issues
+# These can be created manually after cluster deployment:
+# kubectl apply -f - <<EOF
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: eks-readonly
+# rules:
+# - apiGroups: [""]
+#   resources: ["*"]
+#   verbs: ["get", "list", "watch"]
+# - apiGroups: ["apps", "extensions"]
+#   resources: ["*"]
+#   verbs: ["get", "list", "watch"]
+# - apiGroups: ["batch"]
+#   resources: ["*"]
+#   verbs: ["get", "list", "watch"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: eks-readonly-binding
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: eks-readonly
+# subjects:
+# - kind: User
+#   name: readonly-user
+#   apiGroup: rbac.authorization.k8s.io
+# EOF

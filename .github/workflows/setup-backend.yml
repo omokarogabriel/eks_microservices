@@ -1,0 +1,110 @@
+name: Setup Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Backend action'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+        - apply
+        - destroy
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  backend-setup:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup backend configuration
+      working-directory: ./backend-setup
+      run: |
+        # Use single bucket alternative configuration
+        if [ -f single-bucket-alternative.tf ]; then
+          cp single-bucket-alternative.tf main.tf
+        else
+          echo "Error: single-bucket-alternative.tf not found"
+          exit 1
+        fi
+        
+        # Create providers.tf for backend setup
+        cat > providers.tf << 'EOF'
+        terraform {
+          required_version = ">= 1.0"
+          required_providers {
+            aws = {
+              source  = "hashicorp/aws"
+              version = "~> 5.0"
+            }
+          }
+        }
+
+        provider "aws" {
+          region = "us-east-1"
+        }
+        EOF
+
+    - name: Terraform Init
+      working-directory: ./backend-setup
+      run: terraform init
+
+    - name: Terraform Plan
+      working-directory: ./backend-setup
+      run: terraform plan -out=tfplan
+
+    - name: Terraform Apply
+      if: github.event.inputs.action == 'apply'
+      working-directory: ./backend-setup
+      run: terraform apply -auto-approve tfplan
+
+    - name: Display backend configuration
+      if: github.event.inputs.action == 'apply'
+      run: |
+        echo "✅ Backend resources created successfully!"
+        echo ""
+        echo "📋 Backend Configuration for environments:"
+        echo ""
+        echo "S3 Bucket: microservices-eks-terraform-state"
+        echo "DynamoDB Table: microservices-eks-terraform-locks"
+        echo ""
+        echo "Environment-specific keys:"
+        echo "- Dev: dev/terraform.tfstate"
+        echo "- Staging: staging/terraform.tfstate"
+        echo "- Prod: prod/terraform.tfstate"
+        echo ""
+        echo "🔧 Update your backend.tf files with:"
+        echo "bucket         = \"microservices-eks-terraform-state\""
+        echo "dynamodb_table = \"microservices-eks-terraform-locks\""
+
+    - name: Terraform Destroy
+      if: github.event.inputs.action == 'destroy'
+      working-directory: ./backend-setup
+      run: terraform destroy -auto-approve
+
+    - name: Confirm destruction
+      if: github.event.inputs.action == 'destroy'
+      run: |
+        echo "✅ Backend resources destroyed successfully!"
+        echo "S3 bucket and DynamoDB table have been removed"

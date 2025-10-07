@@ -5,7 +5,7 @@ resource "aws_security_group" "eks_cluster_sg" {
   vpc_id      = var.vpc_id
 
   tags = merge(var.common_tags, {
-    Name = "${var.cluster_name}-cluster-sg"
+    Name                                        = "${var.cluster_name}-cluster-sg"
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   })
 }
@@ -28,7 +28,7 @@ resource "aws_security_group" "eks_node_sg" {
   vpc_id      = var.vpc_id
 
   tags = merge(var.common_tags, {
-    Name = "${var.cluster_name}-node-sg"
+    Name                                        = "${var.cluster_name}-node-sg"
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   })
 }
@@ -84,7 +84,7 @@ resource "aws_security_group" "eks_pod_sg" {
   vpc_id      = var.vpc_id
 
   tags = merge(var.common_tags, {
-    Name = "${var.cluster_name}-pod-sg"
+    Name                                        = "${var.cluster_name}-pod-sg"
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   })
 }

@@ -18,11 +18,11 @@ resource "aws_vpc" "this" {
 
 ###create Internet Gateway
 resource "aws_internet_gateway" "this" {
-  vpc_id = aws_vpc.this.id  
+  vpc_id = aws_vpc.this.id
   tags = merge(var.common_tags, {
     Name = "${var.env_name}-igw"
     Type = "internet-gateway"
-  })   
+  })
 }
 
 ###create Public subnets
@@ -35,8 +35,8 @@ resource "aws_subnet" "public" {
 
 
   tags = merge(var.common_tags, {
-    Name = "${var.env_name}-public-subnet-${count.index + 1}"
-    Type = "public-subnet"
+    Name                     = "${var.env_name}-public-subnet-${count.index + 1}"
+    Type                     = "public-subnet"
     "kubernetes.io/role/elb" = "1"
   })
 }
@@ -48,10 +48,10 @@ resource "aws_subnet" "private" {
   cidr_block        = var.private_subnet_cidrs[count.index]
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
-  
+
   tags = merge(var.common_tags, {
-    Name = "${var.env_name}-private-subnet-${count.index + 1}"
-    Type = "private-subnet"
+    Name                              = "${var.env_name}-private-subnet-${count.index + 1}"
+    Type                              = "private-subnet"
     "kubernetes.io/role/internal-elb" = "1"
   })
 }

@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Values.namespace | default "default" }}
-  labels:
-    name: {{ .Values.namespace | default "default" }}
-    {{- include "microservice.labels" . | nindent 4 }}

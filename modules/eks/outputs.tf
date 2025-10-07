@@ -100,17 +100,17 @@ output "eks_addons" {
     vpc_cni        = aws_eks_addon.vpc_cni.addon_name
     coredns        = aws_eks_addon.coredns.addon_name
     kube_proxy     = aws_eks_addon.kube_proxy.addon_name
-    ebs_csi_driver = aws_eks_addon.ebs_csi_driver.addon_name
+    ebs_csi_driver = length(aws_eks_addon.ebs_csi_driver) > 0 ? aws_eks_addon.ebs_csi_driver[0].addon_name : null
   }
 }
 
 output "node_group_resources" {
   description = "EKS node group resource information"
   value = {
-    capacity_type    = aws_eks_node_group.this.capacity_type
-    instance_types   = aws_eks_node_group.this.instance_types
-    ami_type        = aws_eks_node_group.this.ami_type
-    disk_size       = aws_eks_node_group.this.disk_size
-    remote_access   = aws_eks_node_group.this.remote_access
+    capacity_type  = aws_eks_node_group.this.capacity_type
+    instance_types = aws_eks_node_group.this.instance_types
+    ami_type       = aws_eks_node_group.this.ami_type
+    disk_size      = aws_eks_node_group.this.disk_size
+    remote_access  = aws_eks_node_group.this.remote_access
   }
 }

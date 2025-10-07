@@ -74,7 +74,7 @@ output "security_group_rules" {
     }
     pod_rules = {
       ingress = [aws_security_group_rule.pod_ingress_cluster.id]
-      egress = [aws_security_group_rule.pod_egress_internet.id]
+      egress  = [aws_security_group_rule.pod_egress_internet.id]
     }
     alb_rules = var.enable_alb_security_group ? {
       ingress = [

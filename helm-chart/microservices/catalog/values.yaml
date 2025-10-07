@@ -1,0 +1,46 @@
+serviceName: "catalog"
+namespace: "retail-store"
+replicaCount: 1
+
+image:
+  repository: public.ecr.aws/aws-containers/retail-store-sample-catalog
+  tag: "1.2.4"
+
+app:
+  port: 8080
+  healthPath: "/health"
+  readyPath: "/health"
+  env:
+    - name: GIN_MODE
+      value: "release"
+    - name: RETAIL_CATALOG_PERSISTENCE_PROVIDER
+      value: "mysql"
+
+service:
+  port: 80
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+
+database:
+  mysql:
+    host: ""
+    username: ""
+    password: ""
+    database: "catalog"
+
+# IRSA Configuration
+irsa:
+  enabled: true
+  roleArn: ""  # Will be set via --set during deployment

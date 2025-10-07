@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -15,7 +15,7 @@ terraform {
 
 provider "aws" {
   region = var.region
-  
+
   default_tags {
     tags = {
       Environment = "staging"

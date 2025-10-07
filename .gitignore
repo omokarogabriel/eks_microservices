@@ -1,7 +1,37 @@
-###commenting out the terraform.tfvars files to avoid pushing sensitive data to github
-###.terraform/
-###.terraform.lock.hcl
-###*.tfstate
-###*.tfstate.backup
-###terraform.tfvars
-###*.tfvars.json
+# Terraform files
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform.tfstate.lock.info
+
+# Backend setup terraform files
+backend-setup/.terraform/
+backend-setup/.terraform.lock.hcl
+backend-setup/*.tfstate*
+
+# Environment specific terraform files
+environments/**/.terraform/
+environments/**/.terraform.lock.hcl
+environments/**/terraform.tfvars
+environments/**/terraform.tfvars.json
+environments/**/*.tfstate*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

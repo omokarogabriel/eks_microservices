@@ -1,0 +1,59 @@
+name: Deploy with Helmfile
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-helmfile:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ github.event.inputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || github.event.inputs.environment == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name retail-store-${{ github.event.inputs.environment }}
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.12.0'
+
+    - name: Install Helmfile
+      run: |
+        wget https://github.com/helmfile/helmfile/releases/download/v0.158.0/helmfile_0.158.0_linux_amd64.tar.gz
+        tar -xzf helmfile_0.158.0_linux_amd64.tar.gz
+        sudo mv helmfile /usr/local/bin/
+        helmfile version
+
+    - name: Deploy with Helmfile
+      run: |
+        ./deploy-helmfile.sh ${{ github.event.inputs.environment }}
+
+    - name: Verify deployment
+      run: |
+        kubectl get pods -n retail-store-${{ github.event.inputs.environment }}
+        kubectl get svc -n retail-store-${{ github.event.inputs.environment }}
+        kubectl get ingress -n retail-store-${{ github.event.inputs.environment }}

@@ -1,0 +1,208 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+      action:
+        description: 'Terraform action'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+        - plan
+        - apply
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      cluster_name: ${{ steps.terraform.outputs.cluster_name }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        terraform_wrapper: false
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ github.event.inputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || github.event.inputs.environment == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Ensure backend exists
+      run: |
+        # Check if S3 bucket exists
+        if ! aws s3api head-bucket --bucket microservices-eks-terraform-state 2>/dev/null; then
+          echo "❌ Backend S3 bucket does not exist!"
+          echo "Please run 'Setup Backend' workflow first"
+          exit 1
+        fi
+        
+        # Check if DynamoDB table exists
+        if ! aws dynamodb describe-table --table-name microservices-eks-terraform-locks 2>/dev/null; then
+          echo "❌ Backend DynamoDB table does not exist!"
+          echo "Please run 'Setup Backend' workflow first"
+          exit 1
+        fi
+        
+        echo "✅ Backend resources verified"
+
+    - name: Terraform Init
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform init
+
+    - name: Terraform Plan
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform plan -out=tfplan
+
+    - name: Terraform Apply
+      if: github.event.inputs.action == 'apply'
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform apply -auto-approve tfplan
+
+    - name: Get cluster name
+      if: github.event.inputs.action == 'apply'
+      id: terraform
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        CLUSTER_NAME=$(terraform output -raw cluster_id)
+        echo "cluster_name=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
+        echo "Cluster name: ${CLUSTER_NAME}"
+
+
+
+  deploy-applications:
+    needs: terraform
+    if: github.event.inputs.action == 'apply' && needs.terraform.outputs.cluster_name != ''
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ github.event.inputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || github.event.inputs.environment == 'staging' && secrets.AWS_ROLE_ARN_STAGING || secrets.AWS_ROLE_ARN_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ needs.terraform.outputs.cluster_name }}
+
+    - name: Wait for cluster readiness
+      run: |
+        echo "Waiting for cluster to be ready..."
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
+        kubectl get nodes
+
+    - name: Get database secrets and IRSA role ARNs
+      run: |
+        # Get database secrets
+        POSTGRES_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ needs.terraform.outputs.cluster_name }}-postgresql-credentials --query SecretString --output text)
+        MYSQL_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ needs.terraform.outputs.cluster_name }}-mysql-credentials --query SecretString --output text)
+        REDIS_SECRET=$(aws secretsmanager get-secret-value --secret-id ${{ needs.terraform.outputs.cluster_name }}-redis-credentials --query SecretString --output text)
+        
+        # Get IRSA role ARNs from Terraform output
+        cd environments/${{ github.event.inputs.environment }}
+        CART_ROLE_ARN=$(terraform output -raw cart_service_role_arn)
+        CATALOG_ROLE_ARN=$(terraform output -raw catalog_service_role_arn)
+        ORDER_ROLE_ARN=$(terraform output -raw order_service_role_arn)
+        CHECKOUT_ROLE_ARN=$(terraform output -raw checkout_service_role_arn)
+        cd ../..
+        
+        # Store in environment (secrets are not exposed in logs)
+        echo "POSTGRES_SECRET=${POSTGRES_SECRET}" >> $GITHUB_ENV
+        echo "MYSQL_SECRET=${MYSQL_SECRET}" >> $GITHUB_ENV
+        echo "REDIS_SECRET=${REDIS_SECRET}" >> $GITHUB_ENV
+        echo "CART_ROLE_ARN=${CART_ROLE_ARN}" >> $GITHUB_ENV
+        echo "CATALOG_ROLE_ARN=${CATALOG_ROLE_ARN}" >> $GITHUB_ENV
+        echo "ORDER_ROLE_ARN=${ORDER_ROLE_ARN}" >> $GITHUB_ENV
+        echo "CHECKOUT_ROLE_ARN=${CHECKOUT_ROLE_ARN}" >> $GITHUB_ENV
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.12.0'
+
+    - name: Deploy Gabriel Retail Store
+      run: |
+        # Create namespace
+        kubectl create namespace retail-store-${{ github.event.inputs.environment }} --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Deploy Cart Service
+        helm upgrade --install cart ./helm-chart \
+          --namespace retail-store-${{ github.event.inputs.environment }} \
+          --values ./helm-chart/microservices/cart/values.yaml \
+          --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
+          --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
+          --set irsa.roleArn=$CART_ROLE_ARN \
+          --wait --timeout=300s
+        
+        # Deploy Catalog Service
+        helm upgrade --install catalog ./helm-chart \
+          --namespace retail-store-${{ github.event.inputs.environment }} \
+          --values ./helm-chart/microservices/catalog/values.yaml \
+          --set database.mysql.host=$(echo $MYSQL_SECRET | jq -r '.host') \
+          --set database.mysql.username=$(echo $MYSQL_SECRET | jq -r '.username') \
+          --set database.mysql.password=$(echo $MYSQL_SECRET | jq -r '.password') \
+          --set irsa.roleArn=$CATALOG_ROLE_ARN \
+          --wait --timeout=300s
+        
+        # Deploy Order Service
+        helm upgrade --install order ./helm-chart \
+          --namespace retail-store-${{ github.event.inputs.environment }} \
+          --values ./helm-chart/microservices/order/values.yaml \
+          --set database.postgresql.host=$(echo $POSTGRES_SECRET | jq -r '.host') \
+          --set database.postgresql.username=$(echo $POSTGRES_SECRET | jq -r '.username') \
+          --set database.postgresql.password=$(echo $POSTGRES_SECRET | jq -r '.password') \
+          --set irsa.roleArn=$ORDER_ROLE_ARN \
+          --wait --timeout=300s
+        
+        # Deploy Checkout Service
+        helm upgrade --install checkout ./helm-chart \
+          --namespace retail-store-${{ github.event.inputs.environment }} \
+          --values ./helm-chart/microservices/checkout/values.yaml \
+          --set database.redis.host=$(echo $REDIS_SECRET | jq -r '.host') \
+          --set database.redis.password=$(echo $REDIS_SECRET | jq -r '.password') \
+          --set irsa.roleArn=$CHECKOUT_ROLE_ARN \
+          --wait --timeout=300s
+        
+        # Deploy UI Service
+        helm upgrade --install ui ./helm-chart \
+          --namespace retail-store-${{ github.event.inputs.environment }} \
+          --values ./helm-chart/microservices/ui/values.yaml \
+          --wait --timeout=300s
+
+    - name: Verify deployments
+      run: |
+        helm list --namespace retail-store-${{ github.event.inputs.environment }}
+        kubectl get pods --namespace retail-store-${{ github.event.inputs.environment }}
+        kubectl get svc --namespace retail-store-${{ github.event.inputs.environment }}
+        kubectl get ingress --namespace retail-store-${{ github.event.inputs.environment }}
+        
+        echo "=== Application URL ==="
+        ALB_URL=$(kubectl get ingress ui --namespace retail-store-${{ github.event.inputs.environment }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Ingress not ready")
+        echo "Application URL: http://${ALB_URL}"
